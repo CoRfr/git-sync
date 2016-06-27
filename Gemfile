@@ -6,3 +6,5 @@ gem 'git', git: "git://github.com/CoRfr/ruby-git", branch: "fixutf8"
 gem 'net-ssh'
 gem "minitest"
 gem 'rack-test'
+gem 'facter'
+gem 'parallel'

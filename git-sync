@@ -3,14 +3,21 @@
 require 'ap'
 require 'colored'
 require 'optparse'
+require 'facter'
+require 'parallel'
 
 $LOAD_PATH << File.expand_path(File.join(File.dirname(__FILE__), 'src'))
 require 'git-sync'
 
 dry_run = false
+nb_threads = Facter.value('processors')['count']
 
 OptionParser.new do |opts|
   opts.banner = "Usage: git-sync [@options] <config.yml>"
+
+  opts.on("-t N", "--threads=N", "Number of tasks that should be run in parallel (default: nb cpu (#{nb_threads}))") do |t|
+    nb_threads = t
+  end
 
   opts.on("-n", "--dry-run", "Do not perform actual sync") do
     dry_run = true
@@ -38,6 +45,6 @@ tasks = []
 config.sources.each { |src| tasks += src.schedule }
 
 puts "Performing syncs ...".blue
-tasks.each do |task|
+Parallel.map(tasks, in_processes: nb_threads) do |task|
   task.sync!(dry_run)
 end

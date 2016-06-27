@@ -14,16 +14,16 @@ class GitSync::Source::Single
 
     return if dry_run
 
-    git =
-      if not File.exist?(to)
-        puts "Cloning ..."
-        Git.clone(from, File.basename(to), path: File.dirname(to), mirror: true)
-      else
-        puts "Updating ..."
-        Git.open(to)
-      end
+    if not File.exist?(to)
+      puts "[#{to}] Cloning ..."
+      Git.clone(from, File.basename(to), path: File.dirname(to), mirror: true)
+    else
+      puts "[#{to}] Updating ..."
+      git = Git.open(to, bare: true)
+      git.fetch("origin")
+    end
 
-    git.fetch("origin")
+    puts "[#{to}] Done ..."
   end
 
   def schedule
