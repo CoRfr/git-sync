@@ -1,0 +1,3 @@
+sources:
+  - from: 'git@github.com:CoRfr/git-sync.git'
+    to: '/storage/git/git-sync.git'

@@ -1,0 +1,4 @@
+global:
+  to: '/storage/git'
+sources:
+  - from: 'git@github.com:CoRfr/git-sync.git'

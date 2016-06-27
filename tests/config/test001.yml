@@ -1,0 +1,11 @@
+global:
+  to: '/storage/git'
+sources:
+  - type: 'gerrit'
+    host: 'gerrit'
+    username: 'test'
+    to: '/storage/git'
+    filters:
+      - 'jenkins'
+      - '/Git.*/'
+  - from: 'git@github.com:CoRfr/git-sync.git'
