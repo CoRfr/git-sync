@@ -1,10 +1,12 @@
 require 'net/ssh'
+require 'json'
 
 class GitSync::Source::Gerrit
-  attr_accessor :filters
+  attr_accessor :filters, :dry_run
   attr_reader :host, :port, :username, :to
 
   def initialize(host, port, username, from, to)
+    @dry_run = false
     @host = host
     @port = port
     @username = username
@@ -37,7 +39,7 @@ class GitSync::Source::Gerrit
   def ls_projects
     projects = []
 
-    puts "List projects through SSH @ #{host}:#{port} (username: #{username})".green
+    puts "[Gerrit #{host}:#{port}] List projects through SSH (username: #{username})".green
 
     Net::SSH.start(@host,
                    @username,
@@ -53,29 +55,89 @@ class GitSync::Source::Gerrit
     projects
   end
 
-  def sync!(dry_run=false)
-    schedule.each do |task|
-      task.sync(dry_run)
+  def process_event(line)
+    puts "[Gerrit #{host}:#{port}] Processing event".red
+    event = JSON.parse(line)
+    yield(event)
+  end
+
+  def stream_events
+    puts "[Gerrit #{host}:#{port}] Streaming events through SSH (username: #{username})".blue
+
+    Net::SSH.start(@host,
+                   @username,
+                   port: @port) do |ssh|
+
+      ssh.open_channel do |channel|
+        channel.exec("gerrit stream-events") do |ch, success|
+          abort "could not execute command" unless success
+
+          channel.on_data do |ch, data|
+            puts "[Gerrit #{host}:#{port}] #{data}"
+            data.each_line do |line|
+              process_event(line) do |event|
+                yield(event)
+              end
+            end
+          end
+
+          channel.on_extended_data do |ch, type, data|
+            puts "[Gerrit #{host}:#{port}] Error #{data}".red
+          end
+
+          channel.on_close do |ch|
+            puts "[Gerrit #{host}:#{port}] Channel is closing!".red
+          end
+        end
+      end
+
+      ssh.loop
     end
   end
 
-  def schedule
-    tasks = []
+  def sync!
+    schedule.each do |task|
+      task.sync
+    end
+  end
 
-    ls_projects.each do |project|
-      if project_filtered_out? project
-        puts "Project #{project} is filtered out".yellow
-        next
+  def work(pool)
+    stream_events do |event|
+      case event["type"]
+      when "ref-updated",
+           "patchset-updated",
+           "change-merged" then
+        task = task_project(event["project"])
+        pool.perform { task.work(pool) } if task
       else
-        puts "Scheduling sync for project #{project}".green
+        puts "[Gerrit #{host}:#{port}] Skipping event #{event["type"]}".yellow
       end
+    end
+  end
 
-      p_from = File.join(@from, "#{project}")
-      p_to = File.join(@to, "#{project}.git")
+  def task_project(project)
 
-      tasks.push GitSync::Source::Single.new(p_from, p_to)
+    if project_filtered_out? project
+      puts "Project #{project} is filtered out".yellow
+      return nil
+    else
+      puts "Scheduling sync for project #{project}".green
     end
 
-    return tasks
+    p_from = File.join(@from, "#{project}")
+    p_to = File.join(@to, "#{project}.git")
+
+    GitSync::Source::Single.new(p_from, p_to, dry_run: dry_run)
+  end
+
+  def tasks
+    t = [self]
+
+    ls_projects.each do |project|
+      task = task_project(project)
+      t.push(task) if task
+    end
+
+    t
   end
 end

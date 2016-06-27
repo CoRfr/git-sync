@@ -2,31 +2,45 @@ require 'colored'
 require 'git'
 
 class GitSync::Source::Single
+  attr_accessor :dry_run
   attr_reader :from, :to
 
-  def initialize(from, to)
+  def initialize(from, to, opts={})
+    @dry_run = opts[:dry_run] || false
     @from = from
     @to = to
   end
 
-  def sync!(dry_run=false)
-    puts "Sync '#{from}' to '#{to}".yellow
+  def work(pool)
+    sync!
+  end
 
-    return if dry_run
+  def sync!
+    puts "Sync '#{from}' to '#{to} (dry run: #{dry_run})".blue
 
     if not File.exist?(to)
       puts "[#{to}] Cloning ..."
-      Git.clone(from, File.basename(to), path: File.dirname(to), mirror: true)
+      if not dry_run
+        pid = Process.fork {
+          Git.clone(from, File.basename(to), path: File.dirname(to), mirror: true)
+        }
+        Process.waitpid(pid)
+      end
     else
       puts "[#{to}] Updating ..."
-      git = Git.open(to, bare: true)
-      git.fetch("origin")
+      if not dry_run
+        pid = Process.fork {
+          git = Git.bare(to)
+          git.fetch("origin")
+        }
+        Process.waitpid(pid)
+      end
     end
 
     puts "[#{to}] Done ..."
   end
 
-  def schedule
+  def tasks
     return [ self ]
   end
 end

@@ -4,18 +4,18 @@ require 'ap'
 require 'colored'
 require 'optparse'
 require 'facter'
-require 'parallel'
+require 'workers'
 
 $LOAD_PATH << File.expand_path(File.join(File.dirname(__FILE__), 'src'))
 require 'git-sync'
 
 dry_run = false
-nb_threads = Facter.value('processors')['count']
+nb_threads = Facter.value('processors')['count']*2
 
 OptionParser.new do |opts|
   opts.banner = "Usage: git-sync [@options] <config.yml>"
 
-  opts.on("-t N", "--threads=N", "Number of tasks that should be run in parallel (default: nb cpu (#{nb_threads}))") do |t|
+  opts.on("-t N", "--threads=N", "Number of tasks that should be run in parallel (default: 2*(nb cpu) (#{nb_threads}))") do |t|
     nb_threads = t
   end
 
@@ -40,11 +40,15 @@ puts "Loading config #{config_path} ...".blue
 config = GitSync::Config.new
 config.load_from_file config_path
 
-puts "Scheduling tasks ...".blue
-tasks = []
-config.sources.each { |src| tasks += src.schedule }
+pool = Workers::Pool.new(size: nb_threads)
 
-puts "Performing syncs ...".blue
-Parallel.map(tasks, in_processes: nb_threads) do |task|
-  task.sync!(dry_run)
+puts "Performing sync ...".blue
+config.sources.each do |src|
+  src.dry_run = dry_run
+
+  src.tasks.each do |task|
+    pool.perform { task.work(pool) }
+  end
 end
+
+pool.join
