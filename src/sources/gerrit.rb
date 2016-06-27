@@ -56,7 +56,7 @@ class GitSync::Source::Gerrit
   end
 
   def process_event(line)
-    puts "[Gerrit #{host}:#{port}] Processing event".red
+    puts "[Gerrit #{host}:#{port}] Processing event".blue
     event = JSON.parse(line)
     yield(event)
   end
@@ -107,7 +107,9 @@ class GitSync::Source::Gerrit
       when "ref-updated",
            "patchset-updated",
            "change-merged" then
-        task = task_project(event["project"])
+        project = event["change"]["project"] if event["change"]
+        project = event["refUpdate"]["project"] if event["refUpdate"]
+        task = task_project(project)
         pool.perform { task.work(pool) } if task
       else
         puts "[Gerrit #{host}:#{port}] Skipping event #{event["type"]}".yellow
