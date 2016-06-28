@@ -1,0 +1,21 @@
+#!/bin/sh
+
+SYNC_USER=${SYNC_USER:-gitsync}
+SYNC_UID=${SYNC_UID:-1000}
+SYNC_GROUP=${SYNC_GROUP:-gitsync}
+SYNC_GID=${SYNC_GID:-1000}
+SYNC_HOME=${SYNC_HOME:-/home/$SYNC_USER}
+
+set -e
+
+if ! id $SYNC_USER > /dev/null 2>&1; then
+    if id $SYNC_UID > /dev/null 2>&1; then
+        deluser $SYNC_UID
+    fi
+
+    addgroup -g $SYNC_GID $SYNC_GROUP
+    adduser -h "$SYNC_HOME" -u $SYNC_UID -G $SYNC_GROUP -s /bin/sh -D $SYNC_USER
+fi
+
+su -c "bundle exec /usr/src/app/git-sync $*" $SYNC_USER
+

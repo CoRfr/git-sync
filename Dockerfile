@@ -11,5 +11,7 @@ RUN bundle install
 
 COPY . /usr/src/app
 
-ENTRYPOINT ["/usr/src/app/git-sync"]
+ADD docker/init /init
+
+ENTRYPOINT ["/init"]
 
