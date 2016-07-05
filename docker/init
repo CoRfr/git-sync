@@ -15,7 +15,12 @@ if ! id $SYNC_USER > /dev/null 2>&1; then
 
     addgroup -g $SYNC_GID $SYNC_GROUP
     adduser -h "$SYNC_HOME" -u $SYNC_UID -G $SYNC_GROUP -s /bin/sh -D $SYNC_USER
+
+    if [ -e "$SYNC_HOME/.ssh" ]; then
+        chown -R $SYNC_UID:$SYNC_GID $SYNC_HOME/.ssh
+    fi
 fi
 
-su -c "bundle exec /usr/src/app/git-sync $*" $SYNC_USER
+cd /usr/src/app
+su -c "bundle exec ./git-sync $*" $SYNC_USER
 
