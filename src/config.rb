@@ -33,7 +33,8 @@ class GitSync::Config
       source = case type
       when "single"
         from = cfg["from"]
-        to = cfg["to"] || default_to
+        name = File.basename(cfg["from"], ".*") + ".git"
+        to = cfg["to"] || File.join(default_to, name)
         GitSync::Source::Single.new(from, to)
 
       when "gerrit"
@@ -63,3 +64,4 @@ class GitSync::Config
     end
   end
 end
+
