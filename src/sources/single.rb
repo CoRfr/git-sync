@@ -31,7 +31,10 @@ class GitSync::Source::Single
       if not dry_run
         pid = Process.fork {
           git = Git.bare(to)
-          git.fetch("origin")
+          if not git.remotes.map{|b| b.name}.include?('gitsync')
+            git.add_remote("gitsync", from, :mirror => 'fetch')
+          end
+          git.fetch("gitsync")
         }
         Process.waitpid(pid)
       end
