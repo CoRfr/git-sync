@@ -3,9 +3,9 @@ require 'json'
 
 class GitSync::Source::Gerrit
   attr_accessor :filters, :dry_run
-  attr_reader :host, :port, :username, :to
+  attr_reader :host, :port, :username, :to, :one_shot
 
-  def initialize(host, port, username, from, to)
+  def initialize(host, port, username, from, to, one_shot=false)
     @dry_run = false
     @host = host
     @port = port
@@ -20,6 +20,7 @@ class GitSync::Source::Gerrit
 
     @to = to
     @filters = []
+    @one_shot = one_shot
   end
 
   def project_filtered_out?(project)
@@ -72,7 +73,7 @@ class GitSync::Source::Gerrit
         channel.exec("gerrit stream-events") do |ch, success|
           abort "could not execute command" unless success
 
-          channel.on_data do |ch, data|
+          channel.on_data do |ch2, data|
             puts "[Gerrit #{host}:#{port}] #{data}"
             data.each_line do |line|
               process_event(line) do |event|
@@ -81,11 +82,11 @@ class GitSync::Source::Gerrit
             end
           end
 
-          channel.on_extended_data do |ch, type, data|
+          channel.on_extended_data do |ch2, type, data|
             puts "[Gerrit #{host}:#{port}] Error #{data}".red
           end
 
-          channel.on_close do |ch|
+          channel.on_close do |ch2|
             puts "[Gerrit #{host}:#{port}] Channel is closing!".red
           end
         end
@@ -102,6 +103,8 @@ class GitSync::Source::Gerrit
   end
 
   def work(pool)
+    return if one_shot
+
     stream_events do |event|
       case event["type"]
       when "ref-updated",
@@ -143,3 +146,4 @@ class GitSync::Source::Gerrit
     t
   end
 end
+

@@ -20,7 +20,9 @@ class GitSync::Config
     default_to = nil
     if @config["global"]
       default_to = @config["global"]["to"]
+      global_one_shot = @config["global"]["one_shot"]
     end
+    global_one_shot ||= false
 
     if not @config["sources"]
       raise "No 'sources' section specified in the config file."
@@ -43,7 +45,8 @@ class GitSync::Config
         username = cfg["username"]
         from = cfg["from"]
         to = cfg["to"] || default_to
-        source = GitSync::Source::Gerrit.new(host, port, username, from, to)
+        one_shot = cfg["one_shot"] || global_one_shot
+        source = GitSync::Source::Gerrit.new(host, port, username, from, to, one_shot)
 
         if cfg["filters"]
           cfg["filters"].each do |filter|
