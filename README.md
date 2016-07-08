@@ -54,5 +54,5 @@ You can optionally specify a mirror using 'from' if you don't want to overload t
 ```
 
 By default the script will use the 'stream-events' command to listen for changes on project and re-synchronize them.
-It is possible to specify the ```one_shot: true``` option, either in global or in the gerrit source definition to prevent the re-sync.
+It is possible to specify the ```oneshot: true``` option, either in global or in the gerrit source definition to prevent the re-sync.
 

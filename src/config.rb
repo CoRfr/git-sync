@@ -20,7 +20,7 @@ class GitSync::Config
     default_to = nil
     if @config["global"]
       default_to = @config["global"]["to"]
-      global_one_shot = @config["global"]["one_shot"]
+      global_one_shot = @config["global"]["oneshot"]
     end
     global_one_shot ||= false
 
@@ -45,7 +45,7 @@ class GitSync::Config
         username = cfg["username"]
         from = cfg["from"]
         to = cfg["to"] || default_to
-        one_shot = cfg["one_shot"] || global_one_shot
+        one_shot = cfg["oneshot"] || global_one_shot
         source = GitSync::Source::Gerrit.new(host, port, username, from, to, one_shot)
 
         if cfg["filters"]
