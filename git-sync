@@ -47,8 +47,12 @@ config.sources.each do |src|
   src.dry_run = dry_run
 
   src.tasks.each do |task|
-    pool.perform { task.work(pool) }
+    pool.perform {
+      task.work(pool)
+      Thread.exit
+    }
   end
 end
 
-pool.join
+pool.dispose
+
