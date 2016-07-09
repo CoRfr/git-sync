@@ -54,5 +54,5 @@ config.sources.each do |src|
   end
 end
 
-pool.dispose
+pool.join
 
