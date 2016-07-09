@@ -102,7 +102,7 @@ class GitSync::Source::Gerrit
     end
   end
 
-  def work(pool)
+  def work(group)
     return if one_shot
 
     stream_events do |event|
@@ -113,7 +113,9 @@ class GitSync::Source::Gerrit
         project = event["change"]["project"] if event["change"]
         project = event["refUpdate"]["project"] if event["refUpdate"]
         task = task_project(project)
-        pool.perform { task.work(pool) } if task
+        group.add(:max_tries => 2) do
+          task.work(group)
+        end if task
       else
         puts "[Gerrit #{host}:#{port}] Skipping event #{event["type"]}".yellow
       end

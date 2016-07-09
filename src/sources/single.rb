@@ -1,5 +1,6 @@
 require 'colored'
 require 'git'
+require 'date'
 
 class GitSync::Source::Single
   attr_accessor :dry_run
@@ -11,7 +12,7 @@ class GitSync::Source::Single
     @to = to
   end
 
-  def work(pool)
+  def work(group)
     sync!
   end
 
@@ -19,7 +20,7 @@ class GitSync::Source::Single
     puts "Sync '#{from}' to '#{to} (dry run: #{dry_run})".blue
 
     if not File.exist?(to)
-      puts "[#{to}] Cloning ..."
+      puts "[#{DateTime.now} #{to}] Cloning ..."
       if not dry_run
         pid = Process.fork {
           Git.clone(from, File.basename(to), path: File.dirname(to), mirror: true)
@@ -27,7 +28,7 @@ class GitSync::Source::Single
         Process.waitpid(pid)
       end
     else
-      puts "[#{to}] Updating ..."
+      puts "[#{DateTime.now} #{to}] Updating ..."
       if not dry_run
         pid = Process.fork {
           git = Git.bare(to)
@@ -40,7 +41,7 @@ class GitSync::Source::Single
       end
     end
 
-    puts "[#{to}] Done ..."
+    puts "[#{DateTime.now} #{to}] Done ..."
   end
 
   def tasks

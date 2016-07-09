@@ -16,7 +16,7 @@ OptionParser.new do |opts|
   opts.banner = "Usage: git-sync [@options] <config.yml>"
 
   opts.on("-t N", "--threads=N", "Number of tasks that should be run in parallel (default: 2*(nb cpu) (#{nb_threads}))") do |t|
-    nb_threads = t
+    nb_threads = t.to_i
   end
 
   opts.on("-n", "--dry-run", "Do not perform actual sync") do
@@ -41,18 +41,29 @@ config = GitSync::Config.new
 config.load_from_file config_path
 
 pool = Workers::Pool.new(size: nb_threads)
+group = Workers::TaskGroup.new(pool: pool)
 
 puts "Performing sync ...".blue
 config.sources.each do |src|
   src.dry_run = dry_run
 
   src.tasks.each do |task|
-    pool.perform {
-      task.work(pool)
-      Thread.exit
-    }
+    group.add(:max_tries => 1) do
+      task.work(group)
+    end
   end
 end
 
-pool.join
+group.run
 
+if not group.failures.empty?
+  group.failures.each_with_index do |t, index|
+    puts "Task #{index} failed".red
+    ap t
+  end
+
+  exit(1)
+end
+
+puts "Success".green
+exit(0)
