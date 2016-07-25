@@ -46,7 +46,7 @@ class GitSync::Source::Gerrit
                    @username,
                    port: @port) do |ssh|
 
-      list = ssh.exec!("gerrit ls-projects")
+      list = ssh.exec!("gerrit ls-projects --type ALL")
       list.each_line do |line|
         project = line.strip
         projects.push project
