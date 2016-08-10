@@ -1,6 +1,9 @@
 git-sync
 ========
 
+![Travis](https://img.shields.io/travis/corfr/git-sync.svg)
+![Coveralls](https://img.shields.io/coveralls/corfr/git-sync.svg)
+
 Synchronize mirror repositories locally from remote sources.
 Helpful to maintain a mirror of projects located on various hosts such as GitHub or Gerrit.
 

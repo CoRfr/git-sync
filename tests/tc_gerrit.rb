@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
-$LOAD_PATH << File.expand_path(File.join(File.dirname(__FILE__), '/../src'))
-require 'git-sync'
+$LOAD_PATH << File.dirname(__FILE__)
+require 'common'
 
 require 'minitest/autorun'
 require 'rack/test'
