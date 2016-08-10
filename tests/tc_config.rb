@@ -15,15 +15,35 @@ class TestConfig < Minitest::Test
   def teardown()
   end
 
+  def load_test_file(file)
+    cfg = GitSync::Config.new
+    cfg.load_from_file(File.join(File.dirname(__FILE__), "config/#{file}.yml"))
+    cfg
+  end
+
   def test_load_file()
-    
     ["test001", "test002", "test003"].each do |file|
-      cfg = GitSync::Config.new
-      cfg.load_from_file(File.join(File.dirname(__FILE__), "config/#{file}.yml"))
+      cfg = load_test_file(file)
 
       cfg.sources.each do |source|
         ap source
       end
+    end
+  end
+
+  def test_load_no_source()
+    begin
+      cfg = load_test_file("test004")
+    rescue RuntimeError => e
+      assert e.message == "No 'sources' section specified in the config file."
+    end
+  end
+
+  def test_load_wrong_source_type()
+    begin
+      cfg = load_test_file("test005")
+    rescue RuntimeError => e
+      assert e.message == "Unknown source type 'wrongtype'"
     end
   end
 end
