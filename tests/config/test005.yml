@@ -1,0 +1,5 @@
+global:
+  to: '/storage/git'
+sources:
+  - type: 'wrongtype'
+    key: 'value'
