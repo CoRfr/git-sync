@@ -11,6 +11,6 @@ gem 'rake'
 group :test do
   gem "minitest"
   gem 'rack-test'
-  gem 'coveralls', require: false
+  gem "codeclimate-test-reporter", require: nil
 end
 
