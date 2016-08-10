@@ -1,10 +1,10 @@
 git-sync
 ========
 
-![Travis](https://img.shields.io/travis/corfr/git-sync.svg)
-![Score](https://img.shields.io/codeclimate/github/corfr/git-sync.svg)
-![Coverage](https://img.shields.io/codeclimate/coverage/github/corfr/git-sync.svg)
-![Issues](https://img.shields.io/codeclimate/issues/github/corfr/git-sync.svg)
+![Travis](https://img.shields.io/travis/CoRfr/git-sync.svg)
+![Score](https://img.shields.io/codeclimate/github/CoRfr/git-sync.svg)
+![Coverage](https://img.shields.io/codeclimate/coverage/github/CoRfr/git-sync.svg)
+![Issues](https://img.shields.io/codeclimate/issues/github/CoRfr/git-sync.svg)
 
 Synchronize mirror repositories locally from remote sources.
 Helpful to maintain a mirror of projects located on various hosts such as GitHub or Gerrit.
