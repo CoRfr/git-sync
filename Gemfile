@@ -12,5 +12,6 @@ group :test do
   gem "minitest"
   gem 'rack-test'
   gem "codeclimate-test-reporter", require: nil
+  gem 'docker-api'
 end
 
