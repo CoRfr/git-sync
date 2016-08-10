@@ -6,7 +6,3 @@ rvm:
 
 script:
   - bundle exec rake test
-
-addons:
-    code_climate:
-        repo_token: $CODE_CLIMATE_TOKEN
