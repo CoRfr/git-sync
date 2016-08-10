@@ -123,7 +123,6 @@ class GitSync::Source::Gerrit
   end
 
   def task_project(project)
-
     if project_filtered_out? project
       puts "Project #{project} is filtered out".yellow
       return nil
