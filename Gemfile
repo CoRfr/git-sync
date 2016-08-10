@@ -6,6 +6,7 @@ gem 'git', git: "git://github.com/CoRfr/ruby-git", branch: "fixutf8"
 gem 'net-ssh'
 gem 'facter'
 gem 'workers'
+gem 'rake'
 
 group :test do
   gem "minitest"
