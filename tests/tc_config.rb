@@ -33,7 +33,7 @@ class TestConfig < Minitest::Test
 
   def test_load_no_source()
     begin
-      cfg = load_test_file("test004")
+      load_test_file("test004")
     rescue RuntimeError => e
       assert e.message == "No 'sources' section specified in the config file."
     end
@@ -41,7 +41,7 @@ class TestConfig < Minitest::Test
 
   def test_load_wrong_source_type()
     begin
-      cfg = load_test_file("test005")
+      load_test_file("test005")
     rescue RuntimeError => e
       assert e.message == "Unknown source type 'wrongtype'"
     end
