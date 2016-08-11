@@ -10,10 +10,19 @@ class GitSync::Source::Single
     @dry_run = opts[:dry_run] || false
     @from = from
     @to = to
+    @done = false
+    @mutex = Mutex.new
   end
 
-  def work(group)
-    sync!
+  def work(queue)
+    @mutex.synchronize { sync! }
+  end
+
+  def wait
+    loop do
+      sleep 0.1
+      return if @done
+    end
   end
 
   def sync!
@@ -42,9 +51,6 @@ class GitSync::Source::Single
     end
 
     puts "[#{DateTime.now} #{to}] Done ..."
-  end
-
-  def tasks
-    return [ self ]
+    @done = true
   end
 end

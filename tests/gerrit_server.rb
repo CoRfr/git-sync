@@ -22,39 +22,50 @@ class GerritServer
   def wait_server_init
     puts "#{name}: gerrit: waiting for server init"
 
-    IO.popen("docker logs -f #{id} 2>&1") do |io|
-      init_complete = false
-
+    waiting_thread = Thread.new do
       while true
-        begin
-          Timeout::timeout(10) do
-            while line = io.gets
-              #puts "#{name}: gerrit: #{line}"
-
-              if line[/Gerrit Code Review .* ready/]
-                init_complete = true
-                Process.kill("KILL", io.pid)
-                break
-              end
-            end
-          end
-        rescue Timeout::Error
-          puts "#{name}: gerrit: still waiting ..."
-        end
-
-        break if init_complete
+        sleep 10
+        puts "#{name}: gerrit: still waiting ..."
       end
-
-      io.close
     end
 
+    if true
+      logs_pid = nil
+
+      IO.popen(["docker", "logs", "-f", id], :err=>[:child, :out]) do |io|
+        while line = io.gets
+          #puts "#{name}: gerrit: #{line}"
+
+          if line[/Gerrit Code Review .* ready/]
+            Process.kill("TERM", io.pid)
+            break
+          end
+        end
+
+        io.close
+      end
+    else
+      ap desc
+      container.streaming_logs(stdout: true, stderr: true) do |stream, chunk|
+        puts "#{name}: gerrit: #{chunk}"
+        if chunk[/Gerrit Code Review .* ready/]
+          break
+        end
+      end
+    end
+
+    waiting_thread.kill
     puts "#{name}: gerrit: server init done"
   end
 
   def init_new_server
     image_name = 'openfrontier/gerrit:latest'
 
+    puts "#{name}: gerrit: pulling image #{image_name}"
     Docker::Image.create('fromImage' => image_name)
+    puts "#{name}: gerrit: pulling image (done)"
+
+    puts "#{name}: gerrit: creating container"
     @container ||= Docker::Container.create('Image' => image_name,
                                             'Env' => [ 'AUTH_TYPE=DEVELOPMENT_BECOME_ANY_ACCOUNT' ],
                                             'PublishAllPorts' => true
@@ -78,6 +89,12 @@ class GerritServer
 
     if ENV['GERRIT_SKIP_TEARDOWN']
       puts "Skipping teardown"
+
+      if not ENV['GERRIT_CONTAINER_ID']
+        puts "To re-use this container:"
+        puts "\texport GERRIT_CONTAINER_ID=#{id}"
+      end
+
       return
     end
 

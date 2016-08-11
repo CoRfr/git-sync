@@ -1,9 +1,10 @@
+require 'colored'
 require 'net/ssh'
 require 'json'
 
 class GitSync::Source::Gerrit
   attr_accessor :filters, :dry_run
-  attr_reader :host, :port, :username, :to, :one_shot
+  attr_reader :host, :port, :username, :to, :one_shot, :projects, :queue
 
   def initialize(host, port, username, from, to, one_shot=false)
     @dry_run = false
@@ -21,6 +22,11 @@ class GitSync::Source::Gerrit
     @to = to
     @filters = []
     @one_shot = one_shot
+
+    @projects = {}
+
+    @mutex = Mutex.new
+    @done = ConditionVariable.new
   end
 
   def project_filtered_out?(project)
@@ -38,7 +44,7 @@ class GitSync::Source::Gerrit
   end
 
   def ls_projects
-    projects = []
+    all_projects = []
 
     puts "[Gerrit #{host}:#{port}] List projects through SSH (username: #{username})".green
 
@@ -49,11 +55,11 @@ class GitSync::Source::Gerrit
       list = ssh.exec!("gerrit ls-projects --type ALL")
       list.each_line do |line|
         project = line.strip
-        projects.push project
+        all_projects.push project
       end
     end
 
-    projects
+    all_projects
   end
 
   def process_event(line)
@@ -96,55 +102,83 @@ class GitSync::Source::Gerrit
     end
   end
 
-  def sync!
-    schedule.each do |task|
-      task.sync
-    end
-  end
+  def work(queue)
+    @queue = queue
 
-  def work(group)
+    # Init: replicate all projects
+    ls_projects.each do |project_name|
+      queue_project(project_name)
+    end
+
+    @done.signal
+
     return if one_shot
 
-    stream_events do |event|
-      case event["type"]
-      when "ref-updated",
-           "patchset-updated",
-           "change-merged" then
-        project = event["change"]["project"] if event["change"]
-        project = event["refUpdate"]["project"] if event["refUpdate"]
-        task = task_project(project)
-        group.add(:max_tries => 2) do
-          task.work(group)
-        end if task
-      else
-        puts "[Gerrit #{host}:#{port}] Skipping event #{event["type"]}".yellow
-      end
+    handle_events
+  end
+
+  def wait
+    sleep if not one_shot
+
+    @mutex.synchronize { @done.wait(@mutex) }
+
+    # Wait for all projects to be synchronized
+    @projects.values.each do |p|
+      p.wait
     end
   end
 
-  def task_project(project)
-    if project_filtered_out? project
-      puts "Project #{project} is filtered out".yellow
+  def handle_events
+    loop do
+      begin
+        stream_events do |event|
+          event_type = event["type"]
+
+          case event_type
+          when "ref-updated",
+               "patchset-updated",
+               "change-merged",
+               "project-created" then
+            puts "[Gerrit #{host}:#{port}] Handling event #{event_type}".green
+            project_name = event["change"]["project"] if event["change"]
+            project_name = event["refUpdate"]["project"] if event["refUpdate"]
+            project_name = event["projectName"] if event["projectName"]
+
+            raise "Unable to get project name for event #{event_type}: #{event}" if not project_name
+
+            queue_project(project_name)
+          else
+            puts "[Gerrit #{host}:#{port}] Skipping event #{event["type"]}".yellow
+          end
+        end
+      rescue Exception => e
+        puts "[Gerrit #{host}:#{port}] Exception #{e.message}".red
+      end
+
+      puts "[Gerrit #{host}:#{port}] Stream events returned, re-launching ...".red
+    end
+  end
+
+  def task_project(project_name)
+    # Return existing object if already initialized
+    return projects[project_name] if projects[project_name]
+
+    if project_filtered_out? project_name
+      puts "Project #{project_name} is filtered out".yellow
       return nil
     else
-      puts "Scheduling sync for project #{project}".green
+      puts "Scheduling sync for project #{project_name}".green
     end
 
-    p_from = File.join(@from, "#{project}")
-    p_to = File.join(@to, "#{project}.git")
+    p_from = File.join(@from, "#{project_name}")
+    p_to = File.join(@to, "#{project_name}.git")
 
-    GitSync::Source::Single.new(p_from, p_to, dry_run: dry_run)
+    projects[project_name] = GitSync::Source::Single.new(p_from, p_to, dry_run: dry_run)
   end
 
-  def tasks
-    t = [self]
-
-    ls_projects.each do |project|
-      task = task_project(project)
-      t.push(task) if task
-    end
-
-    t
+  def queue_project(project_name)
+    project = task_project(project_name)
+    queue << project if project
   end
 end
 

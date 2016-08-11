@@ -5,3 +5,4 @@ Rake::TestTask.new do |t|
   t.test_files = FileList['tests/tc_*.rb']
   t.verbose = true
 end
+

@@ -4,7 +4,6 @@ require 'ap'
 require 'colored'
 require 'optparse'
 require 'facter'
-require 'workers'
 
 $LOAD_PATH << File.expand_path(File.join(File.dirname(__FILE__), 'src'))
 require 'git-sync'
@@ -40,29 +39,41 @@ puts "Loading config #{config_path} ...".blue
 config = GitSync::Config.new
 config.load_from_file config_path
 
-pool = Workers::Pool.new(size: nb_threads)
-group = Workers::TaskGroup.new(pool: pool)
+sync_queue = Queue.new
 
-puts "Performing sync ...".blue
-config.sources.each do |src|
-  src.dry_run = dry_run
+threads = []
+nb_threads.downto(1) do
+  puts "Creating thread ...".red
 
-  src.tasks.each do |task|
-    group.add(:max_tries => 1) do
-      task.work(group)
+  threads << Thread.new do
+    #puts "Starting thread ..."
+
+    begin
+      while w = sync_queue.pop
+        puts "Processing #{w} [start] ..."
+        w.work(sync_queue)
+        puts "Processing #{w} [end] ..."
+      end
+    rescue Exception => e
+      puts e.message
+      STDERR.puts e.message
     end
+
+    puts "Exiting thread ...".red
   end
 end
 
-group.run
+puts "Performing sync ...".blue
 
-if not group.failures.empty?
-  group.failures.each_with_index do |t, index|
-    puts "Task #{index} failed".red
-    ap t
-  end
+# Schedule all sources
+config.sources.each do |src|
+  src.dry_run = dry_run
+  sync_queue << src
+end
 
-  exit(1)
+# Wait for all sources to finish their job
+config.sources.each do |src|
+  src.wait
 end
 
 puts "Success".green

@@ -38,6 +38,8 @@ class TestSync < Minitest::Test
   def init_repository(name)
     git = Git.init(File.join(tmpdir, "orig", name))
     git.add_remote("origin", "ssh://#{gerrit.username}@#{gerrit.host}:#{gerrit.ssh_port}/#{name}")
+    git.config("user.name", "Test User")
+    git.config("user.email", "user@test.com")
     git
   end
 
@@ -83,6 +85,10 @@ class TestSync < Minitest::Test
     exec_path = File.expand_path(File.join(File.dirname(__FILE__), '/../git-sync'))
     IO.popen("#{exec_path} #{config_path}") do |io|
       @current_git_sync_pid = io.pid
+
+      if block_given?
+        yield
+      end
 
       while line = io.gets
         puts "#{name}: #{line}"
@@ -197,9 +203,17 @@ class TestSync < Minitest::Test
       ]
     }
 
+    mutex = Mutex.new
+    mutex.lock
+    resource = ConditionVariable.new
+
     thread = Thread.new do
-      exec_git_sync(config)
+      exec_git_sync(config) do
+        resource.signal
+      end
     end
+
+    resource.wait(mutex)
 
     git_orig_ref = git.object('HEAD').sha
 
