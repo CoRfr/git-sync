@@ -136,7 +136,7 @@ class GitSync::Source::Gerrit
 
           case event_type
           when "ref-updated",
-               "patchset-updated",
+               "patchset-created",
                "change-merged",
                "project-created" then
             puts "[Gerrit #{host}:#{port}] Handling event #{event_type}".green
