@@ -12,7 +12,10 @@ services:
 before_install:
   - docker pull openfrontier/gerrit:latest
   - ssh-keygen -b 2048 -t rsa -q -N "" -f /home/travis/.ssh/id_rsa
-  - docker run -d -P --env AUTH_TYPE=DEVELOPMENT_BECOME_ANY_ACCOUNT --name gerrit openfrontier/gerrit:latest
+  - docker run -d -p 8080:8080 -p 29418:29418 --env AUTH_TYPE=DEVELOPMENT_BECOME_ANY_ACCOUNT --name gerrit openfrontier/gerrit:latest
+  - while true; do docker logs --tail 1 gerrit 2>&1 | grep ready && break || echo "waiting"; sleep 30; done
+  - ssh-keyscan -p 29418 localhost > /home/travis/.ssh/known_hosts
+  - ssh-keyscan -p 29418 127.0.0.1 >> /home/travis/.ssh/known_hosts
 
 env:
   - GERRIT_SKIP_TEARDOWN=true GERRIT_CONTAINER_ID=gerrit
