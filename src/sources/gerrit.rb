@@ -138,6 +138,7 @@ class GitSync::Source::Gerrit
           when "ref-updated",
                "patchset-created",
                "change-merged",
+               "draft-published",
                "project-created" then
             puts "[Gerrit #{host}:#{port}] Handling event #{event_type}".green
             project_name = event["change"]["project"] if event["change"]
