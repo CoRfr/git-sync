@@ -12,6 +12,17 @@ class GitSync::Source::Single
     @to = to
     @done = false
     @mutex = Mutex.new
+
+    # If it's a local repository
+    if @from.start_with? "/"
+      if File.exist? @from
+        return
+      elsif File.exist? "#{@from}.git" # Bare
+        @from = "#{@from}.git"
+      else
+        throw "Unable to sync '#{@from}"
+      end
+    end
   end
 
   def work(queue)
