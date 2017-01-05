@@ -50,7 +50,7 @@ class GitSync::Config
 
         if cfg["filters"]
           cfg["filters"].each do |filter|
-            if filter.start_with? "/" and filter.end_with? "/" 
+            if filter.start_with? "/" and filter.end_with? "/"
               filter = Regexp.new( filter.gsub(/(^\/|\/$)/,'') )
             end
 

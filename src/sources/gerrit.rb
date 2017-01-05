@@ -11,7 +11,7 @@ class GitSync::Source::Gerrit
     @host = host
     @port = port
     @username = username
-    
+
     @from = from
     if not @from
       @from = "ssh://"
