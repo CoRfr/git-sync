@@ -92,6 +92,10 @@ class GitSync::Source::Gerrit
             puts "[Gerrit #{host}:#{port}] Error #{data}".red
           end
 
+          channel.on_eof do |ch2|
+            puts "[Gerrit #{host}:#{port}] EOF".red
+          end
+
           channel.on_close do |ch2|
             puts "[Gerrit #{host}:#{port}] Channel is closing!".red
           end
@@ -118,7 +122,14 @@ class GitSync::Source::Gerrit
   end
 
   def wait
-    sleep if not one_shot
+    if not one_shot
+      loop do
+        begin
+          sleep
+        rescue Interrupt
+        end
+      end
+    end
 
     @mutex.synchronize { @done.wait(@mutex) }
 
@@ -156,7 +167,9 @@ class GitSync::Source::Gerrit
         puts "[Gerrit #{host}:#{port}] Exception #{e.message}".red
       end
 
-      puts "[Gerrit #{host}:#{port}] Stream events returned, re-launching ...".red
+      delay = 30
+      puts "[Gerrit #{host}:#{port}] Stream events returned, re-launching in #{delay}s ...".red
+      sleep delay
     end
   end
 

@@ -47,7 +47,7 @@ class TestSync < Minitest::Test
     (0...length).map { ('a'..'z').to_a[rand(26)] }.join
   end
 
-  def gen_commit(git)
+  def gen_commit(git, msg="")
     size = 2 ** 4
     name = random_name
 
@@ -56,7 +56,7 @@ class TestSync < Minitest::Test
     end
 
     git.add(name)
-    git.commit(name)
+    git.commit("[#{msg}] #{name}")
   end
 
   def create_gerrit_project(name, nb_commits)
@@ -69,7 +69,7 @@ class TestSync < Minitest::Test
     git = init_repository(name)
 
     for i in 0..nb_commits
-      gen_commit(git)
+      gen_commit(git, i)
     end
 
     git.push("origin")
@@ -161,8 +161,8 @@ class TestSync < Minitest::Test
     assert File.exist?(File.join(dest_dir, "#{name}.git"))
   end
 
-  def wait_for_ref(git_dir, refname, ref)
-    Timeout.timeout(20) do
+  def wait_for_ref(git_dir, refname, ref, timeout=20)
+    Timeout.timeout(timeout) do
       while true
         if File.exist?(git_dir)
           begin
@@ -236,4 +236,75 @@ class TestSync < Minitest::Test
     Process.kill("INT", @current_git_sync_pid)
     thread.join
   end
+
+  def test_sync_gerrit_restart()
+    setup_gerrit
+
+    # Prepare
+    name = random_name(20)
+    git = create_gerrit_project(name, 10)
+
+    dest_dir = File.join(tmpdir, "sync")
+
+    config = {
+      'sources' => [
+        {
+          "type" => "gerrit",
+          "host" => gerrit.host,
+          "port" => gerrit.ssh_port,
+          "username" => gerrit.username,
+          "to" => dest_dir
+        }
+      ]
+    }
+
+    mutex = Mutex.new
+    mutex.lock
+    resource = ConditionVariable.new
+
+    thread = Thread.new do
+      exec_git_sync(config) do
+        resource.signal
+      end
+    end
+
+    resource.wait(mutex)
+
+    git_orig_ref = git.object('HEAD').sha
+
+    git_sync_dir = File.join(dest_dir, "#{name}.git")
+
+    puts "Waiting for the latest commit to be replicated .. #{git_orig_ref}"
+    wait_for_ref(git_sync_dir, 'master', git_orig_ref)
+
+    commit = gen_commit(git)
+    ap commit
+    git.push("origin")
+
+    new_orig_ref = git.object('HEAD').sha
+
+    # Wait for this new reference to be replicated
+    puts "Waiting for the new commit to be replicated .. #{new_orig_ref}"
+    wait_for_ref(git_sync_dir, 'master', new_orig_ref)
+
+    # Restart gerrit 
+    @gerrit.restart
+
+    git.add_remote("origin2", "ssh://#{gerrit.username}@#{gerrit.host}:#{gerrit.ssh_port}/#{name}")
+
+    commit = gen_commit(git)
+    ap commit
+    git.push("origin2")
+
+    new_orig_ref = git.object('HEAD').sha
+
+    # Wait for this new reference to be replicated
+    puts "Waiting for the new commit to be replicated .. #{new_orig_ref}"
+    wait_for_ref(git_sync_dir, 'master', new_orig_ref, 360)
+
+    @expected_git_sync_ret = 2
+    Process.kill("INT", @current_git_sync_pid)
+    thread.join
+  end
 end
+

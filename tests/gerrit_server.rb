@@ -9,14 +9,77 @@ class GerritServer
 
   def initialize(name)
     @name = name
+    @start_count = 0
 
     if ENV['GERRIT_CONTAINER_ID']
       @container = Docker::Container.get(ENV['GERRIT_CONTAINER_ID'])
+      @start_count = detect_initial_start_count
     else
       init_new_server
     end
 
+    puts @start_count
+
     wait_server_init
+  end
+
+  def detect_initial_start_count
+    start_detected = 0
+
+    args = ["docker", "logs", id]
+
+    begin
+      IO.popen(args, :err=>[:child, :out]) do |io|
+        io.readlines.each do |line|
+          #puts "#{name}: gerrit: #{line}"
+
+          if line[/Gerrit Code Review .* ready/]
+            start_detected += 1
+            puts "#{start_detected}".red
+          end
+        end
+
+        io.close
+      end
+    rescue EOFError
+    end
+    
+    start_detected
+  end
+
+  def detect_start_count(expected=1)
+    start_detected = 0
+
+    args = ["docker", "logs", "-f", id]
+
+    puts "Wait #{expected}"
+
+    begin
+      IO.popen(args, :err=>[:child, :out]) do |io|
+        reached = false
+
+        io.each_line do |line| 
+          #puts "#{name}: gerrit: #{line}"
+
+          if line[/Gerrit Code Review .* ready/]
+            start_detected += 1
+            STDERR.puts "#{start_detected}".blue
+            if start_detected >= expected
+              Process.kill("TERM", io.pid)
+              STDERR.puts "Reached #{expected}".blue
+              reached = true
+              break
+            end
+          end
+        end
+
+        io.close
+      end
+    rescue EOFError
+      puts "EOF".red
+    end
+
+    start_detected
   end
 
   def wait_server_init
@@ -30,20 +93,7 @@ class GerritServer
     end
 
     if true
-      logs_pid = nil
-
-      IO.popen(["docker", "logs", "-f", id], :err=>[:child, :out]) do |io|
-        while line = io.gets
-          #puts "#{name}: gerrit: #{line}"
-
-          if line[/Gerrit Code Review .* ready/]
-            Process.kill("TERM", io.pid)
-            break
-          end
-        end
-
-        io.close
-      end
+      detect_start_count(@start_count)
     else
       ap desc
       container.streaming_logs(stdout: true, stderr: true) do |stream, chunk|
@@ -68,7 +118,8 @@ class GerritServer
     puts "#{name}: gerrit: creating container"
     @container ||= Docker::Container.create('Image' => image_name,
                                             'Env' => [ 'AUTH_TYPE=DEVELOPMENT_BECOME_ANY_ACCOUNT' ],
-                                            'PublishAllPorts' => true
+                                            'PublishAllPorts' => true,
+                                            'PortBindings' => { "29418/tcp" => [{"HostPort":"29418"}]}
                                             )
 
     raise "Unable to create Gerrit container" if not container
@@ -78,6 +129,8 @@ class GerritServer
     container.start
 
     puts "#{name}: container #{id} started"
+
+    @start_count += 1
   end
 
   def id
@@ -105,6 +158,19 @@ class GerritServer
     puts "#{name}: container #{id} removed"
   end
 
+  def restart
+    container.kill!
+    puts "#{name}: container #{id} killed"
+
+    container.start
+    puts "#{name}: container #{id} started"
+
+    @start_count += 1
+    @desc = nil
+
+    wait_server_init
+  end
+
   def desc
     @desc ||= container.json
   end
@@ -114,11 +180,11 @@ class GerritServer
   end
 
   def http_port
-    @http_port ||= desc["NetworkSettings"]["Ports"]["8080/tcp"][0]["HostPort"].to_i
+    desc["NetworkSettings"]["Ports"]["8080/tcp"][0]["HostPort"].to_i
   end
 
   def ssh_port
-    @ssh_port ||= desc["NetworkSettings"]["Ports"]["29418/tcp"][0]["HostPort"].to_i
+    desc["NetworkSettings"]["Ports"]["29418/tcp"][0]["HostPort"].to_i
   end
 
   def username
