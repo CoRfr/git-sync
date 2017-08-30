@@ -1,6 +1,7 @@
 require 'colored'
 require 'git'
 require 'date'
+require 'fileutils'
 
 class GitSync::Source::Single
   attr_accessor :dry_run
@@ -38,6 +39,11 @@ class GitSync::Source::Single
 
   def sync!
     puts "Sync '#{from}' to '#{to} (dry run: #{dry_run})".blue
+
+    if File.exists?(to) and not File.exists?(File.join(to, "objects"))
+      puts "[#{DateTime.now} #{to}] Corrupted, removing!".yellow
+      FileUtils.rm_rf(to)
+    end
 
     if not File.exist?(to)
       puts "[#{DateTime.now} #{to}] Cloning ..."

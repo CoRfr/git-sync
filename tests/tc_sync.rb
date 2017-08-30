@@ -5,6 +5,7 @@ require 'common'
 require 'gerrit_server'
 require 'git'
 require 'securerandom'
+require 'fileutils'
 
 require 'minitest/autorun'
 require 'rack/test'
@@ -159,6 +160,24 @@ class TestSync < Minitest::Test
     assert File.exist?(File.join(dest_dir, "All-Users.git"))
     assert File.exist?(File.join(dest_dir, "All-Projects.git"))
     assert File.exist?(File.join(dest_dir, "#{name}.git"))
+  end
+
+  def test_sync_invalid()
+    dest_dir = File.join(tmpdir, "git", "git-sync.git")
+
+    FileUtils.mkdir_p(dest_dir)
+
+    config = {
+      'sources' => [
+        {
+          "from" => 'https://github.com/CoRfr/git-sync.git',
+          "to" => dest_dir
+        }
+      ]
+    }
+
+    exec_git_sync(config)
+    assert File.exist?(File.join(dest_dir, "objects"))
   end
 
   def wait_for_ref(git_dir, refname, ref, timeout=20)
