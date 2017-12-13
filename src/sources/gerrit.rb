@@ -109,8 +109,13 @@ class GitSync::Source::Gerrit
   def work(queue)
     @queue = queue
 
+    remote_projects = ls_projects
+
+    # Remove deleted projects if any
+    check_local_projects(remote_projects)
+
     # Init: replicate all projects
-    ls_projects.each do |project_name|
+    remote_projects.each do |project_name|
       queue_project(project_name)
     end
 
@@ -194,5 +199,40 @@ class GitSync::Source::Gerrit
     project = task_project(project_name)
     queue << project if project
   end
+
+  def check_local_projects(remote_projects)
+    local_projects = Dir.glob("#{@to}/**/*.git")
+
+    remote_projects.each do |project_name|
+      p_to = File.join(@to, "#{project_name}.git")
+      local_projects = local_projects.reject {|x| x == p_to}
+    end
+
+    local_projects.each do |to|
+      if same_remote?(to)
+        puts "Deleting \"#{to}\" project from local disk!"
+        FileUtils.rm_rf(to)
+      end
+    end
+
+  end
+
+  def same_remote?(to)
+    same_remote = false
+    git = Git.bare(to)
+
+    # Look for the remote
+    git.remotes.each do |remote|
+      next if remote.name != "gitsync"
+
+      if remote.url.index(@from) == 0
+        same_remote = true
+        break
+      end
+    end
+
+    return same_remote
+  end
+
 end
 
