@@ -205,6 +205,10 @@ class GitSync::Source::Gerrit
 
     remote_projects.each do |project_name|
       p_to = File.join(@to, "#{project_name}.git")
+
+      # Skip symlink to keep .repo/manifest.git
+      next if p_to.symlink?
+
       local_projects = local_projects.reject {|x| x == p_to}
     end
 

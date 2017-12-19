@@ -43,7 +43,7 @@ class GerritServer
       end
     rescue EOFError
     end
-    
+
     start_detected
   end
 
@@ -58,7 +58,7 @@ class GerritServer
       IO.popen(args, :err=>[:child, :out]) do |io|
         reached = false
 
-        io.each_line do |line| 
+        io.each_line do |line|
           #puts "#{name}: gerrit: #{line}"
 
           if line[/Gerrit Code Review .* ready/]

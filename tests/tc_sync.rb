@@ -306,7 +306,7 @@ class TestSync < Minitest::Test
     puts "Waiting for the new commit to be replicated .. #{new_orig_ref}"
     wait_for_ref(git_sync_dir, 'master', new_orig_ref)
 
-    # Restart gerrit 
+    # Restart gerrit
     @gerrit.restart
 
     git.add_remote("origin2", "ssh://#{gerrit.username}@#{gerrit.host}:#{gerrit.ssh_port}/#{name}")
