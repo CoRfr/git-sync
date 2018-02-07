@@ -57,6 +57,7 @@ nb_threads.downto(1) do
     rescue Exception => e
       puts e.message
       STDERR.puts e.message
+      exit 1
     end
 
     puts "Exiting thread ...".red
