@@ -13,8 +13,7 @@ if ! id $SYNC_USER > /dev/null 2>&1; then
         deluser $SYNC_UID
     fi
 
-    groupadd --gid $SYNC_GID $SYNC_GROUP
-    useradd --home "$SYNC_HOME" --uid $SYNC_UID --gid $SYNC_GID --shell /bin/sh $SYNC_USER
+    adduser -h "$SYNC_HOME" -u $SYNC_UID -s /bin/sh -D $SYNC_USER $SYNC_GID
 
     if [ -e "$SYNC_HOME/.ssh" ]; then
         chown -R $SYNC_UID:$SYNC_GID $SYNC_HOME/.ssh
