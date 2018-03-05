@@ -6,6 +6,9 @@ SYNC_GROUP=${SYNC_GROUP:-gitsync}
 SYNC_GID=${SYNC_GID:-1000}
 SYNC_HOME=${SYNC_HOME:-/home/$SYNC_USER}
 
+GIT_PACK_WINDOW_MEMORY=${GIT_PACK_WINDOW_MEMORY:-1g}
+GIT_PACK_SIZE_LIMIT=${GIT_PACK_SIZE_LIMIT:-1g}
+
 set -e
 
 if ! id $SYNC_USER > /dev/null 2>&1; then
@@ -19,6 +22,10 @@ if ! id $SYNC_USER > /dev/null 2>&1; then
         chown -R $SYNC_UID:$SYNC_GID $SYNC_HOME/.ssh
     fi
 fi
+
+# Configure git
+su -c "git config --global pack.windowMemory ${GIT_PACK_WINDOW_MEMORY}"
+su -c "git config --global pack.packSizeLimit ${GIT_PACK_SIZE_LIMIT}"
 
 cd /usr/src/app
 su -c "bundle exec ./git-sync $*" $SYNC_USER
