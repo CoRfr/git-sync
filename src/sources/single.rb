@@ -26,6 +26,10 @@ class GitSync::Source::Single
     end
   end
 
+  def to_s
+    "<Source::Single '#{from}' -> '#{to}'>"
+  end
+
   def work(queue)
     @mutex.synchronize { sync! }
   end

@@ -4,7 +4,7 @@ require 'json'
 
 class GitSync::Source::Gerrit
   attr_accessor :filters, :dry_run
-  attr_reader :host, :port, :username, :to, :one_shot, :projects, :queue
+  attr_reader :host, :port, :username, :from, :to, :one_shot, :projects, :queue
 
   def initialize(host, port, username, from, to, one_shot=false)
     @dry_run = false
@@ -27,6 +27,10 @@ class GitSync::Source::Gerrit
 
     @mutex = Mutex.new
     @done = ConditionVariable.new
+  end
+
+  def to_s
+    "<Source::Gerrit #{from}>"
   end
 
   def project_filtered_out?(project)
@@ -73,6 +77,8 @@ class GitSync::Source::Gerrit
 
     Net::SSH.start(@host,
                    @username,
+                   keepalive: true,
+                   keepalive_interval: 15,
                    port: @port) do |ssh|
 
       ssh.open_channel do |channel|
@@ -131,7 +137,9 @@ class GitSync::Source::Gerrit
       loop do
         begin
           sleep
-        rescue Interrupt
+        rescue Interrupt => e
+          STDERR.puts "Interrupt:"
+          STDERR.puts e
         end
       end
     end
@@ -156,7 +164,7 @@ class GitSync::Source::Gerrit
                "change-merged",
                "draft-published",
                "project-created" then
-            puts "[Gerrit #{host}:#{port}] Handling event #{event_type}".green
+            STDERR.puts "[Gerrit #{host}:#{port}] Handling event #{event_type}".green
             project_name = event["change"]["project"] if event["change"]
             project_name = event["refUpdate"]["project"] if event["refUpdate"]
             project_name = event["projectName"] if event["projectName"]
@@ -165,15 +173,15 @@ class GitSync::Source::Gerrit
 
             queue_project(project_name)
           else
-            puts "[Gerrit #{host}:#{port}] Skipping event #{event["type"]}".yellow
+            STDERR.puts "[Gerrit #{host}:#{port}] Skipping event #{event["type"]}".yellow
           end
         end
       rescue Exception => e
-        puts "[Gerrit #{host}:#{port}] Exception #{e.message}".red
+        STDERR.puts "[Gerrit #{host}:#{port}] Exception #{e.message}".red
       end
 
-      delay = 30
-      puts "[Gerrit #{host}:#{port}] Stream events returned, re-launching in #{delay}s ...".red
+      delay = 5
+      STDERR.puts "[Gerrit #{host}:#{port}] Stream events returned, re-launching in #{delay}s ...".red
       sleep delay
     end
   end
