@@ -9,6 +9,7 @@ $LOAD_PATH << File.expand_path(File.join(File.dirname(__FILE__), 'src'))
 require 'git-sync'
 
 dry_run = false
+@timeout = nil
 @nb_threads = Facter.value('processors')['count']*2
 
 OptionParser.new do |opts|
@@ -16,6 +17,10 @@ OptionParser.new do |opts|
 
   opts.on("-t N", "--threads=N", "Number of tasks that should be run in parallel (default: 2*(nb cpu) (#{@nb_threads}))") do |t|
     @nb_threads = t.to_i
+  end
+
+  opts.on("--timeout=S", "Timeout in seconds for operations that are not 'live'") do |t|
+    @timeout = t.to_i
   end
 
   opts.on("-n", "--dry-run", "Do not perform actual sync") do
@@ -46,21 +51,25 @@ sync_queue = Queue.new
 
 def print_threads
   STDERR.puts "Thread states:"
-  1.upto(@nb_threads) do |n|
-    state = @thread_states[n]
+  Thread.list.each do |thread|
 
-    if not state
-      STDERR.puts "[#{n}] Inactive"
-      next
+    n = @threads.index(thread)
+    if n
+      state = @thread_states[n]
+
+      if not state
+        STDERR.puts "[#{n}] Inactive"
+        next
+      end
+
+      duration = Time.now - state[:timestamp]
+      STDERR.puts "[#{n}] #{Time.at(duration).utc.strftime "%H:%M:%S"} #{state[:work]}"
+    else
+      STDERR.puts "[#] #{thread.inspect} #{thread.status}"
     end
 
-    duration = Time.now - state[:timestamp]
-    STDERR.puts "[#{n}] #{Time.at(duration).utc.strftime "%H:%M:%S"} #{state[:work]}"
-
-    if @threads[n-1]
-      STDERR.puts @threads[n-1].backtrace.join("\n")
-    else
-      STDERR.puts "No stack"
+    if thread.backtrace
+      STDERR.puts thread.backtrace.join("\n")
     end
   end
 end
@@ -71,9 +80,15 @@ Signal.trap("USR1") do
 end
 
 Signal.trap("INT") do
+  puts "Interrupted".red
   print_threads
-  puts "Killed".red
   exit(2)
+end
+
+Signal.trap("TERM") do
+  puts "Killed".red
+  print_threads
+  exit(3)
 end
 
 # Creating threads
@@ -92,6 +107,8 @@ end
             timestamp: Time.now,
             work: w
         }
+
+        w.timeout = @timeout if @timeout
 
         # Process
         w.work(sync_queue)

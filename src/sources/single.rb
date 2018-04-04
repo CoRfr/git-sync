@@ -2,17 +2,19 @@ require 'colored'
 require 'git'
 require 'date'
 require 'fileutils'
+require 'timeout'
 
-class GitSync::Source::Single
-  attr_accessor :dry_run
+class GitSync::Source::Single < GitSync::Source::Base
   attr_reader :from, :to
 
   def initialize(from, to, opts={})
+    super()
     @dry_run = opts[:dry_run] || false
     @from = from
     @to = to
     @done = false
     @mutex = Mutex.new
+    @queue = nil
 
     # If it's a local repository
     if @from.start_with? "/"
@@ -31,6 +33,7 @@ class GitSync::Source::Single
   end
 
   def work(queue)
+    @queue = queue
     @mutex.synchronize { sync! }
   end
 
@@ -49,13 +52,13 @@ class GitSync::Source::Single
       FileUtils.rm_rf(to)
     end
 
+    pid = nil
     if not File.exist?(to)
       puts "[#{DateTime.now} #{to}] Cloning ..."
       if not dry_run
         pid = Process.fork {
           Git.clone(from, File.basename(to), path: File.dirname(to), mirror: true)
         }
-        Process.waitpid(pid)
       end
     else
       puts "[#{DateTime.now} #{to}] Updating ..."
@@ -82,7 +85,32 @@ class GitSync::Source::Single
 
           git.fetch("gitsync")
         }
-        Process.waitpid(pid)
+      end
+    end
+
+    if pid
+      begin
+        Timeout.timeout(timeout) {
+          Process.waitpid(pid)
+        }
+
+      # In case of timeout, send a series of SIGTERM and SIGKILL
+      rescue Timeout::Error
+        STDERR.puts "Timeout: sending TERM to #{pid}".red
+        Process.kill("TERM", pid)
+
+        begin
+          Timeout.timeout(20) {
+            Process.waitpid(pid)
+          }
+        rescue Timeout::Error
+          STDERR.puts "Timeout: sending KILL to #{pid}".red
+          Process.kill("KILL", pid)
+          Process.waitpid(pid)
+        end
+
+        # Add ourselves back at the end of the queue
+        @queue << self
       end
     end
 

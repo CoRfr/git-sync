@@ -2,12 +2,12 @@ require 'colored'
 require 'net/ssh'
 require 'json'
 
-class GitSync::Source::Gerrit
-  attr_accessor :filters, :dry_run
+class GitSync::Source::Gerrit < GitSync::Source::Base
+  attr_accessor :filters
   attr_reader :host, :port, :username, :from, :to, :one_shot, :projects, :queue
 
   def initialize(host, port, username, from, to, one_shot=false)
-    @dry_run = false
+    super()
     @host = host
     @port = port
     @username = username
