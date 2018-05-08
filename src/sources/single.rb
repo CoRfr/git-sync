@@ -44,12 +44,32 @@ class GitSync::Source::Single < GitSync::Source::Base
     end
   end
 
+  def git
+    @git ||= Git.bare(to)
+  end
+
+  def check_corrupted
+    puts "[#{DateTime.now} #{to}] Checking for corruption".yellow
+    unless git.fsck
+      puts "[#{DateTime.now} #{to}] Repository OK".green
+      return
+    end
+
+    handle_corrupted
+  end
+
+  def handle_corrupted
+    puts "[#{DateTime.now} #{to}] Corrupted".red
+    # Remove the complete repository by default
+    FileUtils.rm_rf(to)
+    exit 1
+  end
+
   def sync!
     puts "Sync '#{from}' to '#{to} (dry run: #{dry_run})".blue
 
     if File.exists?(to) and not File.exists?(File.join(to, "objects"))
-      puts "[#{DateTime.now} #{to}] Corrupted, removing!".yellow
-      FileUtils.rm_rf(to)
+      handle_corrupted
     end
 
     pid = nil
@@ -64,7 +84,6 @@ class GitSync::Source::Single < GitSync::Source::Base
       puts "[#{DateTime.now} #{to}] Updating ..."
       if not dry_run
         pid = Process.fork {
-          git = Git.bare(to)
           add_remote = true
 
           # Look for the remove and if it needs to be updated
@@ -83,7 +102,12 @@ class GitSync::Source::Single < GitSync::Source::Base
             git.add_remote("gitsync", from, :mirror => 'fetch')
           end
 
-          git.fetch("gitsync")
+          begin
+            git.fetch("gitsync")
+          rescue Git::GitExecuteError => e
+            puts "[#{DateTime.now} #{to}] Issue with fetching: #{e}".red
+            check_corrupted
+          end
         }
       end
     end
@@ -92,6 +116,12 @@ class GitSync::Source::Single < GitSync::Source::Base
       begin
         Timeout.timeout(timeout) {
           Process.waitpid(pid)
+
+          # If there was any issue in the sync, add back to the queue
+          if $?.exitstatus != 0
+            STDERR.puts "Fetch process #{pid} failed: #{$?.exitstatus}".red
+            @queue << self
+          end
         }
 
       # In case of timeout, send a series of SIGTERM and SIGKILL
