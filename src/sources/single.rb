@@ -7,6 +7,8 @@ require 'timeout'
 class GitSync::Source::Single < GitSync::Source::Base
   attr_reader :from, :to
 
+  EXIT_CORRUPTED = 3
+
   def initialize(from, to, opts={})
     super()
     @dry_run = opts[:dry_run] || false
@@ -50,7 +52,7 @@ class GitSync::Source::Single < GitSync::Source::Base
 
   def check_corrupted
     puts "[#{DateTime.now} #{to}] Checking for corruption".yellow
-    unless git.fsck
+    if git.lib.fsck
       puts "[#{DateTime.now} #{to}] Repository OK".green
       return
     end
@@ -62,7 +64,10 @@ class GitSync::Source::Single < GitSync::Source::Base
     puts "[#{DateTime.now} #{to}] Corrupted".red
     # Remove the complete repository by default
     FileUtils.rm_rf(to)
-    exit 1
+
+    # Exit the current process, as to warn the parent that there is
+    # a corruption going on.
+    exit EXIT_CORRUPTED
   end
 
   def sync!
@@ -118,9 +123,15 @@ class GitSync::Source::Single < GitSync::Source::Base
           Process.waitpid(pid)
 
           # If there was any issue in the sync, add back to the queue
-          if $?.exitstatus != 0
-            STDERR.puts "Fetch process #{pid} failed: #{$?.exitstatus}".red
-            @queue << self
+          status = $?.exitstatus
+          if status != 0
+            STDERR.puts "Fetch process #{pid} failed: #{status}".red
+            case status
+            when EXIT_CORRUPTED
+              @queue << self
+            else
+              STDERR.puts "Exit code #{status} not handled"
+            end
           end
         }
 
@@ -139,7 +150,7 @@ class GitSync::Source::Single < GitSync::Source::Base
           Process.waitpid(pid)
         end
 
-        # Add ourselves back at the end of the queue
+        # Add ourselves back at the end of the queue in case of timeout
         @queue << self
       end
     end

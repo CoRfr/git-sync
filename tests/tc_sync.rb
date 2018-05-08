@@ -98,7 +98,7 @@ class TestSync < Minitest::Test
       io.close
       ret = $?.exitstatus
       puts "#{name}: Exit Code #{ret}"
-      assert ret == @expected_git_sync_ret
+      assert_equal(ret, @expected_git_sync_ret)
     end
   end
 
