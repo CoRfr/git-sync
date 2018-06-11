@@ -8,4 +8,4 @@ sources:
     filters:
       - 'jenkins'
       - '/Git.*/'
-  - from: 'git@github.com:CoRfr/git-sync.git'
+  - from: 'git@github.com:swi-infra/git-sync.git'

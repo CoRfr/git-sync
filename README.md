@@ -1,10 +1,10 @@
 git-sync
 ========
 
-![Travis](https://img.shields.io/travis/CoRfr/git-sync.svg)
-![Score](https://img.shields.io/codeclimate/github/CoRfr/git-sync.svg)
-![Coverage](https://img.shields.io/codeclimate/coverage/github/CoRfr/git-sync.svg)
-![Issues](https://img.shields.io/codeclimate/issues/github/CoRfr/git-sync.svg)
+![Travis](https://img.shields.io/travis/swi-infra/git-sync.svg)
+![Score](https://img.shields.io/codeclimate/github/swi-infra/git-sync.svg)
+![Coverage](https://img.shields.io/codeclimate/coverage/github/swi-infra/git-sync.svg)
+![Issues](https://img.shields.io/codeclimate/issues/github/swi-infra/git-sync.svg)
 
 Synchronize mirror repositories locally from remote sources.
 Helpful to maintain a mirror of projects located on various hosts such as GitHub or Gerrit.
@@ -18,8 +18,8 @@ The 'git-sync' script takes a config.yml as a parameter which is formatted like 
 global:
     to: '/storage/git'
 sources:
-  - from: 'https://github.com/CoRfr/git-sync'
-  - from: 'https://github.com/CoRfr/ruby-git'
+  - from: 'https://github.com/swi-infra/git-sync'
+  - from: 'https://github.com/swi-infra/ruby-git'
     to: '/mnt/external/ruby-git.git'
   - type: 'gerrit'
     host: 'gerrit-host'
@@ -39,7 +39,7 @@ Default (and simpliest) type. Will synchronize from a Git remote ('from') to som
 If a default global 'to' is provided, path will be built using it plus the basename of the Git remote.
 
 ```
-  - from: 'https://github.com/CoRfr/ruby-git'
+  - from: 'https://github.com/swi-infra/ruby-git'
     to: '/mnt/external/ruby-git.git'
 ```
 

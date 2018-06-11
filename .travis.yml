@@ -11,12 +11,17 @@ services:
   - docker
 
 before_install:
-  - docker pull openfrontier/gerrit:latest
+  - docker pull quay.io/swi-infra/gerrit:latest
   - ssh-keygen -b 2048 -t rsa -q -N "" -f /home/travis/.ssh/id_rsa
-  - docker run -d -p 8080:8080 -p 29418:29418 --env AUTH_TYPE=DEVELOPMENT_BECOME_ANY_ACCOUNT --name gerrit openfrontier/gerrit:latest
+  - docker run -d -p 8080:8080 -p 29418:29418 --env AUTH_TYPE=DEVELOPMENT_BECOME_ANY_ACCOUNT --name gerrit quay.io/swi-infra/gerrit:latest
   - while true; do docker logs --tail 1 gerrit 2>&1 | grep ready && break || echo "waiting"; sleep 30; done
   - ssh-keyscan -p 29418 localhost > /home/travis/.ssh/known_hosts
   - ssh-keyscan -p 29418 127.0.0.1 >> /home/travis/.ssh/known_hosts
+
+before_script:
+  - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
+  - chmod +x ./cc-test-reporter
+  - ./cc-test-reporter before-build
 
 env:
   - GERRIT_SKIP_TEARDOWN=true GERRIT_CONTAINER_ID=gerrit
@@ -24,3 +29,5 @@ env:
 script:
   - bundle exec rake test
 
+after_script:
+  - ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT

@@ -88,12 +88,14 @@ class GitSync::Source::Single < GitSync::Source::Base
   def sync!
     puts "Sync '#{from}' to '#{to} (dry run: #{dry_run})".blue
 
-    if File.exists?(to) and not File.exists?(File.join(to, "objects"))
+    should_clone = true
+    should_clone = (Dir.entries(to).count <= 2) if File.exists?(to)
+    if not should_clone and not File.exists?(File.join(to, "objects"))
       handle_corrupted
     end
 
     pid = nil
-    if not File.exist?(to)
+    if should_clone
       puts "[#{DateTime.now} #{to}] Cloning ..."
       if not dry_run
         pid = Process.fork {

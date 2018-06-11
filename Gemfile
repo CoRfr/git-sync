@@ -2,7 +2,7 @@ source "https://rubygems.org"
 
 gem 'awesome_print'
 gem 'colored'
-gem 'git', git: "https://github.com/CoRfr/ruby-git", branch: "master"
+gem 'git', git: "https://github.com/swi-infra/ruby-git", branch: "master"
 gem 'net-ssh'
 gem 'facter'
 gem 'rake'

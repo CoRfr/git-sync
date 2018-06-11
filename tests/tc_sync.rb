@@ -121,7 +121,7 @@ class TestSync < Minitest::Test
     config = {
       'sources' => [
         {
-          "from" => 'https://github.com/CoRfr/git-sync.git',
+          "from" => 'https://github.com/swi-infra/git-sync.git',
           "to" => dest_dir
         }
       ]
@@ -170,7 +170,7 @@ class TestSync < Minitest::Test
     config = {
       'sources' => [
         {
-          "from" => 'https://github.com/CoRfr/git-sync.git',
+          "from" => 'https://github.com/swi-infra/git-sync.git',
           "to" => dest_dir
         }
       ]
