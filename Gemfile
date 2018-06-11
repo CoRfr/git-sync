@@ -6,6 +6,7 @@ gem 'git', git: "https://github.com/swi-infra/ruby-git", branch: "master"
 gem 'net-ssh'
 gem 'facter'
 gem 'rake'
+gem 'bunny'
 
 group :test do
   gem "minitest"

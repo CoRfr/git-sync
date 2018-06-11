@@ -46,7 +46,33 @@ class GitSync::Config
         from = cfg["from"]
         to = cfg["to"] || default_to
         one_shot = cfg["oneshot"] || global_one_shot
-        source = GitSync::Source::Gerrit.new(host, port, username, from, to, one_shot)
+        source = GitSync::Source::GerritSsh.new(host, port, username, from, to, one_shot)
+
+        if cfg["filters"]
+          cfg["filters"].each do |filter|
+            if filter.start_with? "/" and filter.end_with? "/"
+              filter = Regexp.new( filter.gsub(/(^\/|\/$)/,'') )
+            end
+
+            source.filters.push filter
+          end
+        end
+
+        source
+
+      when "gerrit-rabbitmq"
+        gerrit_host = cfg["gerrit_host"]
+        gerrit_port = cfg["gerrit_port"] || 29418
+        rabbitmq_host = cfg["rabbitmq_host"] || gerrit_host
+        rabbitmq_port = cfg["rabbitmq_port"] || 5672
+        exchange = cfg["exchange"]
+        username = cfg["username"]
+        from = cfg["from"]
+        to = cfg["to"] || default_to
+        one_shot = cfg["oneshot"] || global_one_shot
+        source = GitSync::Source::GerritRabbitMQ.new(gerrit_host, gerrit_port,
+                                                     rabbitmq_host, rabbitmq_port, exchange,
+                                                     username, from, to, one_shot)
 
         if cfg["filters"]
           cfg["filters"].each do |filter|
