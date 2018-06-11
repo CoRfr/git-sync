@@ -17,6 +17,7 @@ class GitSync::Source::Single < GitSync::Source::Base
     @done = false
     @mutex = Mutex.new
     @queue = nil
+    @should_resync = false
 
     # If it's a local repository
     if @from.start_with? "/"
@@ -36,7 +37,21 @@ class GitSync::Source::Single < GitSync::Source::Base
 
   def work(queue)
     @queue = queue
-    @mutex.synchronize { sync! }
+    res = @mutex.try_lock
+    if res
+      sync!
+      @mutex.unlock
+
+      if @should_resync
+        # Place ourselves back in the queue
+        @should_resync = false
+        queue.push self
+      end
+    else
+      # Couldn't get the lock, but tell the current sync
+      # that it should resync when its done.
+      @should_resync = true
+    end
   end
 
   def wait
