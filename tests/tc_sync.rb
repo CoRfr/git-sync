@@ -5,6 +5,7 @@ require 'common'
 require 'gerrit_server'
 require 'git'
 require 'securerandom'
+require 'fileutils'
 
 require 'minitest/autorun'
 require 'rack/test'
@@ -95,9 +96,9 @@ class TestSync < Minitest::Test
       end
 
       io.close
-      ret = $?.to_i
+      ret = $?.exitstatus
       puts "#{name}: Exit Code #{ret}"
-      assert ret == @expected_git_sync_ret
+      assert_equal(ret, @expected_git_sync_ret)
     end
   end
 
@@ -161,6 +162,24 @@ class TestSync < Minitest::Test
     assert File.exist?(File.join(dest_dir, "#{name}.git"))
   end
 
+  def test_sync_invalid()
+    dest_dir = File.join(tmpdir, "git", "git-sync.git")
+
+    FileUtils.mkdir_p(dest_dir)
+
+    config = {
+      'sources' => [
+        {
+          "from" => 'https://github.com/CoRfr/git-sync.git',
+          "to" => dest_dir
+        }
+      ]
+    }
+
+    exec_git_sync(config)
+    assert File.exist?(File.join(dest_dir, "objects"))
+  end
+
   def wait_for_ref(git_dir, refname, ref, timeout=20)
     Timeout.timeout(timeout) do
       while true
@@ -170,6 +189,7 @@ class TestSync < Minitest::Test
             if sync_git.object(refname)
               puts sync_git.object(refname).sha
               if sync_git.object(refname).sha == ref
+                puts "Ref #{ref} found"
                 break
               end
             end
@@ -232,6 +252,7 @@ class TestSync < Minitest::Test
     puts "Waiting for the new commit to be replicated .. #{new_orig_ref}"
     wait_for_ref(git_sync_dir, 'master', new_orig_ref)
 
+    puts "Killing sync"
     @expected_git_sync_ret = 2
     Process.kill("INT", @current_git_sync_pid)
     thread.join
@@ -287,8 +308,11 @@ class TestSync < Minitest::Test
     puts "Waiting for the new commit to be replicated .. #{new_orig_ref}"
     wait_for_ref(git_sync_dir, 'master', new_orig_ref)
 
-    # Restart gerrit 
+    # Restart gerrit
     @gerrit.restart
+
+    # Wait a bit for the stream events to reconnect
+    sleep(6)
 
     git.add_remote("origin2", "ssh://#{gerrit.username}@#{gerrit.host}:#{gerrit.ssh_port}/#{name}")
 
@@ -302,6 +326,7 @@ class TestSync < Minitest::Test
     puts "Waiting for the new commit to be replicated .. #{new_orig_ref}"
     wait_for_ref(git_sync_dir, 'master', new_orig_ref, 360)
 
+    puts "Killing sync"
     @expected_git_sync_ret = 2
     Process.kill("INT", @current_git_sync_pid)
     thread.join

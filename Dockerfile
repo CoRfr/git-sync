@@ -1,4 +1,6 @@
-FROM ruby
+FROM ruby:2.4-alpine3.7
+
+RUN apk add --no-cache git build-base
 
 RUN mkdir -p /usr/src/app
 WORKDIR /usr/src/app

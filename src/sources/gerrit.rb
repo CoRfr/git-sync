@@ -2,12 +2,12 @@ require 'colored'
 require 'net/ssh'
 require 'json'
 
-class GitSync::Source::Gerrit
-  attr_accessor :filters, :dry_run
-  attr_reader :host, :port, :username, :to, :one_shot, :projects, :queue
+class GitSync::Source::Gerrit < GitSync::Source::Base
+  attr_accessor :filters
+  attr_reader :host, :port, :username, :from, :to, :one_shot, :projects, :queue
 
   def initialize(host, port, username, from, to, one_shot=false)
-    @dry_run = false
+    super()
     @host = host
     @port = port
     @username = username
@@ -27,6 +27,10 @@ class GitSync::Source::Gerrit
 
     @mutex = Mutex.new
     @done = ConditionVariable.new
+  end
+
+  def to_s
+    "<Source::Gerrit #{from}>"
   end
 
   def project_filtered_out?(project)
@@ -73,6 +77,8 @@ class GitSync::Source::Gerrit
 
     Net::SSH.start(@host,
                    @username,
+                   keepalive: true,
+                   keepalive_interval: 15,
                    port: @port) do |ssh|
 
       ssh.open_channel do |channel|
@@ -109,8 +115,13 @@ class GitSync::Source::Gerrit
   def work(queue)
     @queue = queue
 
+    remote_projects = ls_projects
+
+    # Remove deleted projects if any
+    check_local_projects(remote_projects)
+
     # Init: replicate all projects
-    ls_projects.each do |project_name|
+    remote_projects.each do |project_name|
       queue_project(project_name)
     end
 
@@ -126,7 +137,9 @@ class GitSync::Source::Gerrit
       loop do
         begin
           sleep
-        rescue Interrupt
+        rescue Interrupt => e
+          STDERR.puts "Interrupt:"
+          STDERR.puts e
         end
       end
     end
@@ -151,7 +164,7 @@ class GitSync::Source::Gerrit
                "change-merged",
                "draft-published",
                "project-created" then
-            puts "[Gerrit #{host}:#{port}] Handling event #{event_type}".green
+            STDERR.puts "[Gerrit #{host}:#{port}] Handling event #{event_type}".green
             project_name = event["change"]["project"] if event["change"]
             project_name = event["refUpdate"]["project"] if event["refUpdate"]
             project_name = event["projectName"] if event["projectName"]
@@ -160,15 +173,15 @@ class GitSync::Source::Gerrit
 
             queue_project(project_name)
           else
-            puts "[Gerrit #{host}:#{port}] Skipping event #{event["type"]}".yellow
+            STDERR.puts "[Gerrit #{host}:#{port}] Skipping event #{event["type"]}".yellow
           end
         end
       rescue Exception => e
-        puts "[Gerrit #{host}:#{port}] Exception #{e.message}".red
+        STDERR.puts "[Gerrit #{host}:#{port}] Exception #{e.message}".red
       end
 
-      delay = 30
-      puts "[Gerrit #{host}:#{port}] Stream events returned, re-launching in #{delay}s ...".red
+      delay = 5
+      STDERR.puts "[Gerrit #{host}:#{port}] Stream events returned, re-launching in #{delay}s ...".red
       sleep delay
     end
   end
@@ -194,5 +207,44 @@ class GitSync::Source::Gerrit
     project = task_project(project_name)
     queue << project if project
   end
+
+  def check_local_projects(remote_projects)
+    local_projects = Dir.glob("#{@to}/**/*.git")
+
+    # Skip symlink to keep .repo/manifest.git
+    local_projects = local_projects.reject { |x| File.symlink?(x) }
+
+    remote_projects.each do |project_name|
+      p_to = File.join(@to, "#{project_name}.git")
+
+      local_projects = local_projects.reject {|x| x == p_to}
+    end
+
+    local_projects.each do |to|
+      if same_remote?(to)
+        puts "Deleting \"#{to}\" project from local disk!"
+        FileUtils.rm_rf(to)
+      end
+    end
+
+  end
+
+  def same_remote?(to)
+    same_remote = false
+    git = Git.bare(to)
+
+    # Look for the remote
+    git.remotes.each do |remote|
+      next if remote.name != "gitsync"
+
+      if remote.url.index(@from) == 0
+        same_remote = true
+        break
+      end
+    end
+
+    return same_remote
+  end
+
 end
 

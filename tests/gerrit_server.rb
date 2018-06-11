@@ -43,7 +43,7 @@ class GerritServer
       end
     rescue EOFError
     end
-    
+
     start_detected
   end
 
@@ -58,7 +58,7 @@ class GerritServer
       IO.popen(args, :err=>[:child, :out]) do |io|
         reached = false
 
-        io.each_line do |line| 
+        io.each_line do |line|
           #puts "#{name}: gerrit: #{line}"
 
           if line[/Gerrit Code Review .* ready/]
@@ -109,7 +109,7 @@ class GerritServer
   end
 
   def init_new_server
-    image_name = 'openfrontier/gerrit:latest'
+    image_name = 'quay.io/swi-infra/gerrit:latest'
 
     puts "#{name}: gerrit: pulling image #{image_name}"
     Docker::Image.create('fromImage' => image_name)
@@ -118,8 +118,6 @@ class GerritServer
     puts "#{name}: gerrit: creating container"
     @container ||= Docker::Container.create('Image' => image_name,
                                             'Env' => [ 'AUTH_TYPE=DEVELOPMENT_BECOME_ANY_ACCOUNT' ],
-                                            'PublishAllPorts' => true,
-                                            'PortBindings' => { "29418/tcp" => [{"HostPort":"29418"}]}
                                             )
 
     raise "Unable to create Gerrit container" if not container
@@ -176,15 +174,15 @@ class GerritServer
   end
 
   def host
-    "localhost"
+    desc["NetworkSettings"]["IPAddress"]
   end
 
   def http_port
-    desc["NetworkSettings"]["Ports"]["8080/tcp"][0]["HostPort"].to_i
+    8080
   end
 
   def ssh_port
-    desc["NetworkSettings"]["Ports"]["29418/tcp"][0]["HostPort"].to_i
+    29418
   end
 
   def username

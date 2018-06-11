@@ -9,13 +9,18 @@ $LOAD_PATH << File.expand_path(File.join(File.dirname(__FILE__), 'src'))
 require 'git-sync'
 
 dry_run = false
-nb_threads = Facter.value('processors')['count']*2
+@timeout = nil
+@nb_threads = Facter.value('processors')['count']*2
 
 OptionParser.new do |opts|
   opts.banner = "Usage: git-sync [@options] <config.yml>"
 
-  opts.on("-t N", "--threads=N", "Number of tasks that should be run in parallel (default: 2*(nb cpu) (#{nb_threads}))") do |t|
-    nb_threads = t.to_i
+  opts.on("-t N", "--threads=N", "Number of tasks that should be run in parallel (default: 2*(nb cpu) (#{@nb_threads}))") do |t|
+    @nb_threads = t.to_i
+  end
+
+  opts.on("--timeout=S", "Timeout in seconds for operations that are not 'live'") do |t|
+    @timeout = t.to_i
   end
 
   opts.on("-n", "--dry-run", "Do not perform actual sync") do
@@ -41,25 +46,84 @@ config.load_from_file config_path
 
 sync_queue = Queue.new
 
-threads = []
-nb_threads.downto(1) do
-  puts "Creating thread ...".red
+@threads = []
+@thread_states = []
 
-  threads << Thread.new do
-    #puts "Starting thread ..."
+def print_threads
+  STDERR.puts "Thread states:"
+  Thread.list.each do |thread|
+
+    n = @threads.index(thread)
+    if n
+      state = @thread_states[n]
+
+      if not state
+        STDERR.puts "[#{n}] Inactive"
+        next
+      end
+
+      duration = Time.now - state[:timestamp]
+      STDERR.puts "[#{n}] #{Time.at(duration).utc.strftime "%H:%M:%S"} #{state[:work]}"
+    else
+      STDERR.puts "[#] #{thread.inspect} #{thread.status}"
+    end
+
+    if thread.backtrace
+      STDERR.puts thread.backtrace.join("\n")
+    end
+  end
+end
+
+# Trap SIGUSR1 to print thread states
+Signal.trap("USR1") do
+  print_threads
+end
+
+Signal.trap("INT") do
+  puts "Interrupted".red
+  print_threads
+  exit(2)
+end
+
+Signal.trap("TERM") do
+  puts "Killed".red
+  print_threads
+  exit(3)
+end
+
+# Creating threads
+1.upto(@nb_threads) do |n|
+  puts "[#{n}] Creating thread ...".red
+
+  @threads << Thread.new(n) do |id|
+    puts "[#{id}] Starting thread ..."
 
     begin
       while w = sync_queue.pop
-        puts "Processing #{w} [start] ..."
+        puts "[#{id}] Processing #{w} [start] ..."
+
+        # Save state
+        @thread_states[id] = {
+            timestamp: Time.now,
+            work: w
+        }
+
+        w.timeout = @timeout if @timeout
+
+        # Process
         w.work(sync_queue)
-        puts "Processing #{w} [end] ..."
+        puts "[#{id}] Processing #{w} [end] ..."
+
+        @thread_states[id] = nil
       end
     rescue Exception => e
       puts e.message
       STDERR.puts e.message
+      exit 1
     end
 
     puts "Exiting thread ...".red
+    @thread_states[id] = nil
   end
 end
 
