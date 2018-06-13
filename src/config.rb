@@ -63,16 +63,21 @@ class GitSync::Config
       when "gerrit-rabbitmq"
         gerrit_host = cfg["gerrit_host"]
         gerrit_port = cfg["gerrit_port"] || 29418
+        username = cfg["username"]
         rabbitmq_host = cfg["rabbitmq_host"] || gerrit_host
         rabbitmq_port = cfg["rabbitmq_port"] || 5672
         exchange = cfg["exchange"]
-        username = cfg["username"]
+        rabbitmq_username = cfg["rabbitmq_username"]
+        rabbitmq_password = cfg["rabbitmq_password"]
         from = cfg["from"]
         to = cfg["to"] || default_to
         one_shot = cfg["oneshot"] || global_one_shot
         source = GitSync::Source::GerritRabbitMQ.new(gerrit_host, gerrit_port,
-                                                     rabbitmq_host, rabbitmq_port, exchange,
-                                                     username, from, to, one_shot)
+                                                     username,
+                                                     rabbitmq_host, rabbitmq_port,
+                                                     exchange,
+                                                     rabbitmq_username, rabbitmq_password,
+                                                     from, to, one_shot)
 
         if cfg["filters"]
           cfg["filters"].each do |filter|
@@ -85,6 +90,7 @@ class GitSync::Config
         end
 
         source
+
       else
         raise "Unknown source type '#{type}'"
       end

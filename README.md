@@ -30,7 +30,7 @@ sources:
       - '/meta.*/'
   - type: 'gerrit-rabbitmq'
     gerrit_host: 'gerrit-host'
-    exchange: 'exchange-for-gerrit'
+    exchange: 'gerrit.publish'
     username: 'myuser'
     from: 'git://gerrit-mirror/'
     filters:
@@ -73,13 +73,16 @@ Same as Gerrit above, except rabbitmq is used to stream events. The Gerrit SSH p
 list projects, so `gerrit_host` is still a mandatory parameter (with the optional `gerrit_port`
 default to 29418). The rabbitmq host is assumed to be the same as `gerrit_host`, otherwise can be
 configured with `rabbitmq_host` (with the optional `rabbitmq_port` default to 5672).
-The rabbitmq exchange name is specifed with 'exchange' parameter.
+The rabbitmq exchange name is specifed with `exchange` parameter.
 
 ```
   - type: 'gerrit-rabbitmq'
     gerrit_host: 'gerrit-host'
-    exchange: 'exchange-for-gerrit'
+    exchange: 'gerrit.publish'
     username: 'myuser'
+    rabbitmq_host: 'other-host'
+    rabbitmq_username: 'guest'
+    rabbitmq_password: 'guest'
     from: 'git://gerrit-mirror/'
     filters:
       - 'manifest'

@@ -2,12 +2,23 @@ require 'bunny'
 require 'colored'
 
 class GitSync::Source::GerritRabbitMQ < GitSync::Source::Gerrit
-  attr_reader :rabbitmq_host, :rabbitmq_port, :exchange
+  attr_reader :rabbitmq_host,
+              :rabbitmq_port,
+              :exchange,
+              :rabbitmq_username,
+              :rabbitmq_password
 
-  def initialize(gerrit_host, gerrit_port, rabbitmq_host, rabbitmq_port, exchange, username, from, to, one_shot=false)
+  def initialize(gerrit_host, gerrit_port,
+                 username,
+                 rabbitmq_host, rabbitmq_port,
+                 exchange,
+                 rabbitmq_username, rabbitmq_password,
+                 from, to, one_shot=false)
     @rabbitmq_host = rabbitmq_host
     @rabbitmq_port = rabbitmq_port
-    @exchange = exchange
+    @exchange = exchange || 'gerrit.publish'
+    @rabbitmq_username = rabbitmq_username || 'guest'
+    @rabbitmq_password = rabbitmq_password || 'guest'
 
     super(gerrit_host, gerrit_port, username, from, to, one_shot)
   end
@@ -15,10 +26,13 @@ class GitSync::Source::GerritRabbitMQ < GitSync::Source::Gerrit
   def stream_events
     puts "[GerritRabbitMQ #{rabbitmq_host}:#{rabbitmq_port}:#{exchange}] Streaming events through rabbitmq (username: #{username})".blue
 
-    connection = Bunny.new(:host => @rabbitmq_host, :port => @rabbitmq_port)
+    connection = Bunny.new(:host => rabbitmq_host,
+                           :port => rabbitmq_port,
+                           :user => rabbitmq_username,
+                           :pass => rabbitmq_password)
     connection.start
     channel = connection.create_channel
-    exchange = channel.fanout(@exchange)
+    channel.fanout(exchange)
     queue = channel.queue('', exclusive: true)
     queue.bind(exchange)
 

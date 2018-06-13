@@ -143,6 +143,7 @@ class GitSync::Source::Gerrit < GitSync::Source::Base
         end
       rescue Exception => e
         STDERR.puts "[Gerrit #{host}:#{port}] Exception #{e.message}".red
+        STDERR.puts "[Gerrit #{host}:#{port}] #{e.backtrace.join("\n")}".red
       end
 
       delay = 5
