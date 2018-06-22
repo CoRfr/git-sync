@@ -18,12 +18,34 @@ class GitSync::Config
     @config = YAML.load(yaml)
 
     default_to = nil
+    publishers = []
+
+    # "global" section
     if @config["global"]
       default_to = @config["global"]["to"]
       global_one_shot = @config["global"]["oneshot"]
     end
     global_one_shot ||= false
 
+    # "publishers" section
+    if @config["publishers"]
+      type = @config["publishers"]["type"]
+
+      case type
+      when "rabbitmq"
+        publishers.push GitSync::Source::PublisherRabbitMQ.new(
+                                                               @config["publishers"]["host"],
+                                                               @config["publishers"]["port"] || 5672,
+                                                               @config["publishers"]["exchange"],
+                                                               @config["publishers"]["username"],
+                                                               @config["publishers"]["password"]
+                                                              )
+      else
+        raise "Unknown publisher type '#{type}'"
+      end
+    end
+
+    # "sources" section
     if not @config["sources"]
       raise "No 'sources' section specified in the config file."
     end
@@ -37,7 +59,7 @@ class GitSync::Config
         from = cfg["from"]
         name = File.basename(cfg["from"], ".*") + ".git"
         to = cfg["to"] || File.join(default_to, name)
-        GitSync::Source::Single.new(from, to)
+        GitSync::Source::Single.new(from, to, publishers)
 
       when "gerrit"
         host = cfg["host"]
@@ -46,7 +68,7 @@ class GitSync::Config
         from = cfg["from"]
         to = cfg["to"] || default_to
         one_shot = cfg["oneshot"] || global_one_shot
-        source = GitSync::Source::GerritSsh.new(host, port, username, from, to, one_shot)
+        source = GitSync::Source::GerritSsh.new(host, port, username, from, to, one_shot, publishers)
 
         if cfg["filters"]
           cfg["filters"].each do |filter|
@@ -64,20 +86,23 @@ class GitSync::Config
         gerrit_host = cfg["gerrit_host"]
         gerrit_port = cfg["gerrit_port"] || 29418
         username = cfg["username"]
-        rabbitmq_host = cfg["rabbitmq_host"] || gerrit_host
-        rabbitmq_port = cfg["rabbitmq_port"] || 5672
-        exchange = cfg["exchange"]
-        rabbitmq_username = cfg["rabbitmq_username"]
-        rabbitmq_password = cfg["rabbitmq_password"]
+
+        rabbitmq_cfg = {
+          "host" => cfg["rabbitmq_host"] || gerrit_host,
+          "port" => cfg["rabbitmq_port"] || 5672,
+          "exchange" => cfg["exchange"],
+          "username" => cfg["rabbitmq_username"],
+          "password" => cfg["rabbitmq_password"]
+        }
+
         from = cfg["from"]
         to = cfg["to"] || default_to
         one_shot = cfg["oneshot"] || global_one_shot
-        source = GitSync::Source::GerritRabbitMQ.new(gerrit_host, gerrit_port,
-                                                     username,
-                                                     rabbitmq_host, rabbitmq_port,
-                                                     exchange,
-                                                     rabbitmq_username, rabbitmq_password,
-                                                     from, to, one_shot)
+        source = GitSync::Source::GerritRabbitMQ.new(gerrit_host, gerrit_port, username,
+                                                     from, to,
+                                                     rabbitmq_cfg,
+                                                     one_shot,
+                                                     publishers)
 
         if cfg["filters"]
           cfg["filters"].each do |filter|
